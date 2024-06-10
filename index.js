@@ -57,7 +57,10 @@ async function run() {
     // Collections
     const PetListingDetailsCollection = client.db("PetDB").collection("PetListingDetails");
     const DonationCampaignsDetailsCollection = client.db("PetDB").collection("DonationCampaignsDetails");
+    const DonatedListCollection = client.db("PetDB").collection("DonatedList");
+    const AdoptionRequestCollection = client.db("PetDB").collection("AdoptionRequest");
     const UserCollection = client.db("PetDB").collection("User");
+
 
     // jwt related api
     //auth provider
@@ -106,19 +109,74 @@ async function run() {
     });
 
     // Payment Intent
-    app.post('/create-payment-intent', async(req,res)=>{
-      const {price} = req.body;
-      const amount = parseInt(price * 100);
+    app.post('/create-payment-intent', async (req, res) => {
+      const { price } = req.body;
+      if (!price) {
+        return res.status(400).send({ message: 'Price is required' });
+      }
 
-      const paymentIntent = await stripe.paymentIntents.create({
-        amount:amount,
-        currency:'usd',
-        payment_method_types: ['card']
-      });
-      res.send({
-        clientSecret: paymentIntent.client_secret
-      })
-    })
+      try {
+        const amount = parseInt(price * 100);
+        console.log(`Creating payment intent for amount: ${amount}`);
+
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: amount,
+          currency: 'usd',
+          payment_method_types: ['card']
+        });
+
+        res.send({ clientSecret: paymentIntent.client_secret });
+      } catch (error) {
+        console.error('Error creating payment intent:', error);
+        res.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+    // Update Pet by Id
+    app.put('/updatePet/:id', async (req, res) => {
+      const id = req.params.id;
+      const updatedPet = req.body;
+
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: updatedPet,
+      };
+
+      try {
+        const result = await PetListingDetailsCollection.updateOne(filter, updateDoc);
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: 'Pet not found' });
+        }
+        res.send(result);
+      } catch (error) {
+        console.error('Error updating pet:', error);
+        res.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+    // Update Pet by Id
+    app.put('/updateDonationCampaign/:id', async (req, res) => {
+      const id = req.params.id;
+      const updatedDonationCampaign = req.body;
+
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: updatedDonationCampaign,
+      };
+
+      try {
+        const result = await DonationCampaignsDetailsCollection.updateOne(filter, updateDoc);
+        if (result.matchedCount === 0) {
+          return res.status(404).send({ message: 'Pet not found' });
+        }
+        res.send(result);
+      } catch (error) {
+        console.error('Error updating pet:', error);
+        res.status(500).send({ message: 'Internal Server Error' });
+      }
+    });
+
+
     // Add Pet
     app.post('/addPet', async (req, res) => {
       const pet = req.body;
@@ -127,14 +185,181 @@ async function run() {
       res.send(result);
     });
 
+    // Add Adoption Request
+    app.post('/addAdoptionRequest', async (req, res) => {
+      const adoptionRequest = req.body;
+      console.log('new adoption request', adoptionRequest);
+      const result = await AdoptionRequestCollection.insertOne(adoptionRequest);
+      res.send(result);
+    });
+
+    // Add Donation Campaign
+    app.post('/addDonationCampaign', async (req, res) => {
+      const donationCampaign = req.body;
+      console.log('new donation campaign', donationCampaign);
+      const result = await DonationCampaignsDetailsCollection.insertOne(donationCampaign);
+      res.send(result);
+    });
+
+    // Add Donated List
+    app.post('/addDonatedList', async (req, res) => {
+      const donation = req.body;
+      console.log('new pet', donation);
+      const result = await DonatedListCollection.insertOne(donation);
+      res.send(result);
+    });
+
+
+    // ADD Donated Amount
+    app.put('/addDonatedAmount/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const updatedDonationCampaign = req.body;
+      const food = {
+        $set: {
+          donatedAmount: updatedDonationCampaign.donatedAmount,
+
+        }
+      }
+      const result = await DonationCampaignsDetailsCollection.updateOne(filter, food, options);
+      res.send(result);
+    });
+
+
+
     // * Get Pet by Email
-    app.get('/myFood/:ownerEmail', logger, async (req, res) => {
+    app.get('/myPet/:ownerEmail', logger, async (req, res) => {
       const ownerEmail = req.params.ownerEmail;
       const query = { ownerEmail: ownerEmail };
       const cursor = PetListingDetailsCollection.find(query);
       const results = await cursor.toArray();
       res.send(results);
     });
+
+
+    // * Get Pet by Email
+    app.get('/myAdoptionRequest/:ownerEmail', logger, async (req, res) => {
+      const ownerEmail = req.params.ownerEmail;
+      const query = { ownerEmail: ownerEmail };
+      const cursor = AdoptionRequestCollection.find(query);
+      const results = await cursor.toArray();
+      res.send(results);
+    });
+
+
+    // * Get Donation Campaign by Email
+    app.get('/myDonationCampaign/:ownerEmail', logger, async (req, res) => {
+      const ownerEmail = req.params.ownerEmail;
+      const query = { ownerEmail: ownerEmail };
+      const cursor = DonationCampaignsDetailsCollection.find(query);
+      const results = await cursor.toArray();
+      res.send(results);
+    });
+
+
+    // * Get Donators by campaign id
+    app.get('/donator/:donationCampaignId', logger, async (req, res) => {
+      const donationCampaignId = req.params.donationCampaignId;
+      const query = { donationCampaignId: donationCampaignId };
+      const cursor = DonatedListCollection.find(query);
+      const results = await cursor.toArray();
+      res.send(results);
+    });
+
+    // * Get My Donation by Donator Email
+    app.get('/myDonation/:donatorEmail', logger, async (req, res) => {
+      const donatorEmail = req.params.donatorEmail;
+      const query = { donatorEmail: donatorEmail };
+      const cursor = DonatedListCollection.find(query);
+      const results = await cursor.toArray();
+      res.send(results);
+    });
+
+    // Delete donation by Id
+    app.delete('/donationDelete/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await DonatedListCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
+    // Delete Pet by Id
+    app.delete('/petDelete/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await PetListingDetailsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    // Update Adopted Status
+    app.put('/petUpdateAdoptedStatus/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const status = req.body;
+      console.log(status);
+      const pet = {
+        $set: {
+          adopted: status.adopted,
+        }
+      }
+      const result = await PetListingDetailsCollection.updateOne(filter, pet, options);
+      res.send(result);
+    });
+
+
+    // Update Accept Reject Adoption Request
+    app.put('/acceptRejectAdoptionRequest/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const status = req.body;
+      console.log(status);
+      const pet = {
+        $set: {
+          isAcceptedRequest: status.isAcceptedRequest,
+        }
+      }
+      const result = await AdoptionRequestCollection.updateOne(filter, pet, options);
+      res.send(result);
+    });
+
+    // Update Pause Status
+    app.put('/updateDonationCampaignStatus/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const status = req.body;
+      console.log(status);
+      const pet = {
+        $set: {
+          isPause: status.isPause,
+        }
+      }
+      const result = await DonationCampaignsDetailsCollection.updateOne(filter, pet, options);
+      res.send(result);
+    });
+
+
+
+    // Get Pet Details
+    app.get('/petDetails/:id', logger, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await PetListingDetailsCollection.findOne(query);
+      res.send(result);
+    });
+
+    // Get Donation Campaign Details by ID
+    app.get('/donationCampaignDetailsById/:id', logger, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await DonationCampaignsDetailsCollection.findOne(query);
+      res.send(result);
+    });
+
 
     // GET /PetListingDetails - Retrieve all pet listing details
     app.get('/PetListingDetails', logger, async (req, res) => {
@@ -147,7 +372,7 @@ async function run() {
       }
     });
 
-    // GET /DonationCampaignsDetails - Retrieve all donation campaign details
+    // GET /DonationCampaignsDetails 
     app.get('/DonationCampaignsDetails', logger, async (req, res) => {
       try {
         const result = await DonationCampaignsDetailsCollection.find().toArray();
