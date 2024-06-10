@@ -52,7 +52,7 @@ const logger = async (req, res, next) => {
 async function run() {
   try {
     // Connect the client to the server
-    await client.connect();
+    // await client.connect();
 
     // Collections
     const PetListingDetailsCollection = client.db("PetDB").collection("PetListingDetails");
@@ -83,12 +83,29 @@ async function run() {
       console.log('Logging Out', user);
       res.clearCookie('token', { maxAge: 0 }).send({ success: true })
     })
+    
+    //  get user
+    app.get('/user', async(req,res)=>{
+      const result = await UserCollection.find().toArray();
+      res.send(result);
+    });
+
+    // * Get user by Email
+    app.get('/userDetails/:email', logger, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const cursor = UserCollection.find(query);
+      const results = await cursor.toArray();
+      res.send(results);
+    });
+
+  
 
     // POST /User - Create a new user
     app.post('/User', logger, async (req, res) => {
-      const { email, name, role } = req.body;
+      const { email, name, role, image } = req.body;
 
-      if (!email || !name || !role) {
+      if (!email || !name || !role  || !image) {
         return res.status(400).send({ message: 'Email, name and role are required' });
       }
 
@@ -100,7 +117,7 @@ async function run() {
           return res.send({ message: 'User already exists', insertedId: null });
         }
         // console.log(req.headers);
-        const result = await UserCollection.insertOne({ email, name, role });
+        const result = await UserCollection.insertOne({ email, name, role, image });
         res.send(result);
       } catch (error) {
         console.error('Error creating user:', error);
@@ -216,16 +233,32 @@ async function run() {
       const filter = { _id: new ObjectId(id) }
       const options = { upsert: true };
       const updatedDonationCampaign = req.body;
-      const food = {
+      const donationCampaign = {
         $set: {
           donatedAmount: updatedDonationCampaign.donatedAmount,
 
         }
       }
-      const result = await DonationCampaignsDetailsCollection.updateOne(filter, food, options);
+      const result = await DonationCampaignsDetailsCollection.updateOne(filter, donationCampaign, options);
       res.send(result);
     });
 
+
+    // Make Admin
+    app.put('/makeAdmin/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) }
+      const options = { upsert: true };
+      const updateUser = req.body;
+      const updateRole = {
+        $set: {
+          role: updateUser.role,
+
+        }
+      }
+      const result = await UserCollection.updateOne(filter, updateRole, options);
+      res.send(result);
+    });
 
 
     // * Get Pet by Email
@@ -238,7 +271,7 @@ async function run() {
     });
 
 
-    // * Get Pet by Email
+    // * Get Adoption Request by Email
     app.get('/myAdoptionRequest/:ownerEmail', logger, async (req, res) => {
       const ownerEmail = req.params.ownerEmail;
       const query = { ownerEmail: ownerEmail };
@@ -290,6 +323,14 @@ async function run() {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) }
       const result = await PetListingDetailsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+     // Delete Donation Campaign by Id
+     app.delete('/donationCampaignDelete/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) }
+      const result = await DonationCampaignsDetailsCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -384,7 +425,7 @@ async function run() {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
