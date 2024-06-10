@@ -9,7 +9,7 @@ const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors({
-  origin: ['http://localhost:5000', 'http://localhost:5173',],
+  origin: ['http://localhost:5000', 'http://localhost:5173', 'https://pet-adoption-server-side-two.vercel.app', 'https://adopt-me-a12.web.app', 'https://adopt-me-a12.firebaseapp.com'],
   credentials: true
 }));
 app.use(express.json());
@@ -426,7 +426,7 @@ async function run() {
 
     // Send a ping to confirm a successful connection
     // await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } catch (error) {
     console.error('Error connecting to MongoDB:', error);
   }
